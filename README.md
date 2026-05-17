@@ -1,2 +1,2 @@
-# Getr-nkeliste-
+# Getraenkeliste-
 Einfache Organisation Verwaltung 
