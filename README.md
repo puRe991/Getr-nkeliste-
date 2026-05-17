@@ -6,6 +6,7 @@ Eine produktionsreife, mobile-first Progressive Web App für Freiwillige Feuerwe
 
 - **2-Klick-Buchung:** Mitglied auswählen, Getränk antippen, fertig.
 - **PWA:** installierbar auf Android, iPhone und Desktop, inklusive Service Worker und App-Manifest.
+- **Android APK:** native Android-Hülle über Capacitor, inklusive Gradle-Projekt und Debug-APK-Build-Skript.
 - **Offline vorbereitet:** Buchungen werden in IndexedDB gepuffert und automatisch synchronisiert.
 - **Supabase Backend:** Auth, PostgreSQL, Row Level Security, RPC für atomare Buchungen.
 - **Adminbereich:** Mitglieder, Getränke, Preise, Bestände, Monatsübersicht, CSV-Export und QR-Codes.
@@ -20,6 +21,7 @@ Eine produktionsreife, mobile-first Progressive Web App für Freiwillige Feuerwe
 - TanStack Query und TanStack Table
 - react-hook-form und zod
 - recharts, lucide-react, vite-plugin-pwa
+- Capacitor für Android/APK-Builds
 
 ## Lokale Installation
 
@@ -74,13 +76,53 @@ Row Level Security ist für alle Tabellen aktiv. Schreibzugriffe auf Stammdaten 
 6. Vercel-Domain in Supabase Auth Redirect URLs eintragen.
 7. Deployment starten.
 
-## PWA Nutzung
+## Installation auf Geräten
+
+### Ohne APK als PWA
 
 - Android/Chrome: Menü → „Zum Startbildschirm hinzufügen“.
 - iPhone/Safari: Teilen → „Zum Home-Bildschirm“.
 - Desktop/Chrome/Edge: Installationssymbol in der Adressleiste.
 
 Die App nutzt einen Service Worker für statische Assets und Network-First-Caching für Supabase-Anfragen. Offline-Buchungen werden lokal in IndexedDB gespeichert und bei wiederhergestellter Verbindung synchronisiert.
+
+### Android APK bauen
+
+Für eine installierbare Android-App ist Capacitor eingerichtet. Es gibt zwei Wege zur APK-Datei:
+
+#### APK automatisch über GitHub Actions erstellen
+
+1. In GitHub den Tab **Actions** öffnen.
+2. Den Workflow **Build Android APK** auswählen.
+3. **Run workflow** starten oder einen Pull Request/Push abwarten.
+4. Nach erfolgreichem Lauf das Artifact **getraenkekasse-debug-apk** herunterladen.
+5. Die enthaltene `app-debug.apk` auf das Android-Gerät kopieren und installieren.
+
+#### APK lokal erstellen
+
+Voraussetzung ist ein lokales Android-SDK bzw. Android Studio mit Java- und Gradle-Unterstützung.
+
+Hinweis: Das Repository enthält bewusst keine binären Build-Artefakte und keinen Gradle-Wrapper-JAR. Die APK wird lokal oder in GitHub Actions erzeugt und dort als Artifact bereitgestellt.
+
+```bash
+npm install
+npm run android:apk
+```
+
+Das Debug-APK liegt danach unter:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Für die Installation auf einem Android-Gerät muss ggf. „Unbekannte Apps installieren“ erlaubt werden. Für produktive Verteilung sollte zusätzlich ein signierter Release-Build über Android Studio oder Gradle erstellt werden.
+
+Nützliche Befehle:
+
+```bash
+npm run android:sync  # Web-App bauen und in das Android-Projekt kopieren
+npm run android:open  # Android-Projekt in Android Studio öffnen
+```
 
 ## Entwicklung
 
