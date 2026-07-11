@@ -30,6 +30,8 @@ export type Transaction = {
   drink_id: string
   price: number
   created_at: string
+  cancelled_at: string | null
+  cancel_note: string | null
   user?: Pick<AppUser, 'name'>
   drink?: Pick<Drink, 'name' | 'icon'>
 }

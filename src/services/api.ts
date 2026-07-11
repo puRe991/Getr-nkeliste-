@@ -66,6 +66,22 @@ export async function createBooking(userId: string, drink: Drink) {
   assertNoError(error)
 }
 
+export async function getRecentTransactions(limit = 8) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*, user:users(name), drink:drinks(name, icon)')
+    .is('cancelled_at', null)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  assertNoError(error)
+  return (data ?? []) as Transaction[]
+}
+
+export async function cancelBooking(transactionId: string, note?: string) {
+  const { error } = await supabase.rpc('cancel_booking', { p_transaction_id: transactionId, p_note: note ?? null })
+  assertNoError(error)
+}
+
 export async function getTransactions(from?: string, to?: string) {
   let query = supabase
     .from('transactions')
