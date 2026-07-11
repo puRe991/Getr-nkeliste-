@@ -2,10 +2,18 @@ import { z } from 'zod'
 
 export const userSchema = z.object({
   name: z.string().trim().min(2, 'Mindestens 2 Zeichen').max(80),
+  email: z.string().trim().email('Ungültige E-Mail'),
   role: z.enum(['admin', 'mitglied']),
   is_active: z.boolean(),
   balance: z.number().finite(),
 })
+
+export const passwordChangeSchema = z
+  .object({
+    password: z.string().min(8, 'Mindestens 8 Zeichen'),
+    confirmPassword: z.string().min(8, 'Mindestens 8 Zeichen'),
+  })
+  .refine((data) => data.password === data.confirmPassword, { message: 'Passwörter stimmen nicht überein', path: ['confirmPassword'] })
 
 export const drinkSchema = z.object({
   name: z.string().trim().min(2, 'Mindestens 2 Zeichen').max(80),
@@ -13,6 +21,11 @@ export const drinkSchema = z.object({
   stock: z.number().int().min(0).max(9999),
   is_active: z.boolean(),
   icon: z.string().trim().min(1).max(4),
+})
+
+export const balanceAdjustmentSchema = z.object({
+  amount: z.number().finite().refine((value) => value !== 0, 'Betrag darf nicht 0 sein'),
+  note: z.string().trim().max(140).optional(),
 })
 
 export const bookingSchema = z.object({
@@ -28,3 +41,5 @@ export const dateRangeSchema = z.object({
 
 export type UserFormValues = z.infer<typeof userSchema>
 export type DrinkFormValues = z.infer<typeof drinkSchema>
+export type BalanceAdjustmentFormValues = z.infer<typeof balanceAdjustmentSchema>
+export type PasswordChangeValues = z.infer<typeof passwordChangeSchema>
