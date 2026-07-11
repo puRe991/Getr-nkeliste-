@@ -12,4 +12,5 @@ insert into public.drinks (name, price, stock, icon) values
   ('Kaffee', 0.80, 80, '☕');
 
 insert into public.settings (key, value) values
-  ('app', '{"name":"Getränkekasse","lowStockThreshold":12}');
+  ('app', '{"name":"Getränkekasse","lowStockThreshold":12}'),
+  ('reminders', '{"enabled":true,"negativeBalanceThreshold":-10}');

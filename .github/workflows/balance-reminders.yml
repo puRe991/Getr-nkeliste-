@@ -1,0 +1,22 @@
+name: Send balance reminders
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 1 * *'
+
+jobs:
+  notify:
+    name: Trigger negative balance notifications
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase edge function
+        run: |
+          curl --fail-with-body -X POST "${SUPABASE_URL}/functions/v1/notify-negative-balances" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

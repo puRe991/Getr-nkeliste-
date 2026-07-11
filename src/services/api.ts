@@ -62,7 +62,13 @@ export async function adjustBalance(userId: string, amount: number, note?: strin
 }
 
 export async function createBooking(userId: string, drink: Drink) {
-  const { error } = await supabase.rpc('book_drink', { p_user_id: userId, p_drink_id: drink.id })
+  const { data, error } = await supabase.rpc('book_drink', { p_user_id: userId, p_drink_id: drink.id })
+  assertNoError(error)
+  return data as string
+}
+
+export async function cancelBooking(transactionId: string, note?: string) {
+  const { error } = await supabase.rpc('cancel_booking', { p_transaction_id: transactionId, p_note: note ?? null })
   assertNoError(error)
 }
 

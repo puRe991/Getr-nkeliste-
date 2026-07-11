@@ -85,7 +85,7 @@ function ActiveToggle({ user }: { user: AppUser }) {
 }
 
 function aggregateByUser(transactions: Transaction[]) {
-  return Object.values(transactions.reduce<Record<string, { name: string; sum: number }>>((acc, transaction) => {
+  return Object.values(transactions.filter((transaction) => !transaction.cancelled_at).reduce<Record<string, { name: string; sum: number }>>((acc, transaction) => {
     const name = transaction.user?.name ?? 'Unbekannt'
     acc[name] = { name, sum: (acc[name]?.sum ?? 0) + transaction.price }
     return acc
