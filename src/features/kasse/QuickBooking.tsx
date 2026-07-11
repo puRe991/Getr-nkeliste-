@@ -5,34 +5,87 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { createBooking } from '@/services/api'
-import { saveOfflineBooking } from '@/services/offlineDb'
+import { cancelBooking, createBooking } from '@/services/api'
+import { deleteOfflineBooking, saveOfflineBooking } from '@/services/offlineDb'
 import { formatCurrency } from '@/lib/utils'
-import type { AppUser, Drink } from '@/types/database'
+import type { AppUser, Drink, Transaction } from '@/types/database'
 
-export function QuickBooking({ users, drinks }: { users: AppUser[]; drinks: Drink[] }) {
+const UNDO_WINDOW_MS = 10_000
+
+type BookingResult = { mode: 'online'; transactionId: string } | { mode: 'offline'; offlineId: string }
+
+export function QuickBooking({ users, drinks, transactions }: { users: AppUser[]; drinks: Drink[]; transactions: Transaction[] }) {
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null)
   const [search, setSearch] = useState('')
   const [lastBooked, setLastBooked] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const activeUsers = useMemo(() => users.filter((user) => user.is_active && user.name.toLowerCase().includes(search.toLowerCase())), [users, search])
-  const activeDrinks = useMemo(() => drinks.filter((drink) => drink.is_active), [drinks])
+  const usage = useMemo(() => {
+    const userCounts = new Map<string, number>()
+    const userLastUsed = new Map<string, string>()
+    const drinkCounts = new Map<string, number>()
+    for (const transaction of transactions) {
+      if (transaction.cancelled_at) continue
+      userCounts.set(transaction.user_id, (userCounts.get(transaction.user_id) ?? 0) + 1)
+      if (!userLastUsed.has(transaction.user_id) || transaction.created_at > userLastUsed.get(transaction.user_id)!) {
+        userLastUsed.set(transaction.user_id, transaction.created_at)
+      }
+      drinkCounts.set(transaction.drink_id, (drinkCounts.get(transaction.drink_id) ?? 0) + 1)
+    }
+    return { userCounts, userLastUsed, drinkCounts }
+  }, [transactions])
+
+  const activeUsers = useMemo(
+    () =>
+      users
+        .filter((user) => user.is_active && user.name.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => {
+          const countDiff = (usage.userCounts.get(b.id) ?? 0) - (usage.userCounts.get(a.id) ?? 0)
+          if (countDiff !== 0) return countDiff
+          const lastDiff = (usage.userLastUsed.get(b.id) ?? '').localeCompare(usage.userLastUsed.get(a.id) ?? '')
+          if (lastDiff !== 0) return lastDiff
+          return a.name.localeCompare(b.name)
+        }),
+    [users, search, usage],
+  )
+  const activeDrinks = useMemo(
+    () =>
+      drinks
+        .filter((drink) => drink.is_active)
+        .sort((a, b) => (usage.drinkCounts.get(b.id) ?? 0) - (usage.drinkCounts.get(a.id) ?? 0) || a.name.localeCompare(b.name)),
+    [drinks, usage],
+  )
+
+  const cancel = useMutation({
+    mutationFn: async (result: BookingResult) => {
+      if (result.mode === 'offline') await deleteOfflineBooking(result.offlineId)
+      else await cancelBooking(result.transactionId)
+    },
+    onSuccess: async () => {
+      toast.success('Buchung rückgängig gemacht')
+      await queryClient.invalidateQueries()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
 
   const booking = useMutation({
-    mutationFn: async (drink: Drink) => {
+    mutationFn: async (drink: Drink): Promise<BookingResult> => {
       if (!selectedUser) throw new Error('Bitte Mitglied auswählen')
       if (!navigator.onLine) {
-        await saveOfflineBooking({ id: crypto.randomUUID(), userId: selectedUser.id, drinkId: drink.id, price: drink.price, createdAt: new Date().toISOString() })
-        return 'offline'
+        const offlineId = crypto.randomUUID()
+        await saveOfflineBooking({ id: offlineId, userId: selectedUser.id, drinkId: drink.id, price: drink.price, createdAt: new Date().toISOString() })
+        return { mode: 'offline', offlineId }
       }
-      await createBooking(selectedUser.id, drink)
-      return 'online'
+      const transactionId = await createBooking(selectedUser.id, drink)
+      return { mode: 'online', transactionId }
     },
-    onSuccess: async (mode, drink) => {
+    onSuccess: async (result, drink) => {
       setLastBooked(drink.id)
       window.setTimeout(() => setLastBooked(null), 900)
-      toast.success(mode === 'offline' ? 'Offline gespeichert' : `${drink.name} gebucht`)
+      toast.success(result.mode === 'offline' ? 'Offline gespeichert' : `${drink.name} gebucht`, {
+        duration: UNDO_WINDOW_MS,
+        action: { label: 'Rückgängig', onClick: () => cancel.mutate(result) },
+      })
       await queryClient.invalidateQueries()
     },
     onError: (error) => toast.error(error.message),

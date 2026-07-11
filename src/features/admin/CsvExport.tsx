@@ -4,7 +4,7 @@ import type { Transaction } from '@/types/database'
 
 export function CsvExport({ transactions }: { transactions: Transaction[] }) {
   function exportCsv() {
-    const rows = [['Datum', 'Mitglied', 'Getränk', 'Preis'], ...transactions.map((t) => [t.created_at, t.user?.name ?? '', t.drink?.name ?? '', String(t.price)])]
+    const rows = [['Datum', 'Mitglied', 'Getränk', 'Preis', 'Status'], ...transactions.map((t) => [t.created_at, t.user?.name ?? '', t.drink?.name ?? '', String(t.price), t.cancelled_at ? 'storniert' : 'gebucht'])]
     const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
