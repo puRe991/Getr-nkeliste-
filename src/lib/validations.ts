@@ -2,10 +2,18 @@ import { z } from 'zod'
 
 export const userSchema = z.object({
   name: z.string().trim().min(2, 'Mindestens 2 Zeichen').max(80),
+  email: z.string().trim().email('Ungültige E-Mail'),
   role: z.enum(['admin', 'mitglied']),
   is_active: z.boolean(),
   balance: z.number().finite(),
 })
+
+export const passwordChangeSchema = z
+  .object({
+    password: z.string().min(8, 'Mindestens 8 Zeichen'),
+    confirmPassword: z.string().min(8, 'Mindestens 8 Zeichen'),
+  })
+  .refine((data) => data.password === data.confirmPassword, { message: 'Passwörter stimmen nicht überein', path: ['confirmPassword'] })
 
 export const drinkSchema = z.object({
   name: z.string().trim().min(2, 'Mindestens 2 Zeichen').max(80),
@@ -28,3 +36,4 @@ export const dateRangeSchema = z.object({
 
 export type UserFormValues = z.infer<typeof userSchema>
 export type DrinkFormValues = z.infer<typeof drinkSchema>
+export type PasswordChangeValues = z.infer<typeof passwordChangeSchema>

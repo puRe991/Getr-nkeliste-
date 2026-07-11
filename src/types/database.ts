@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'mitglied'
 export type AppUser = {
   id: string
   name: string
+  email?: string | null
   role: UserRole
   is_active: boolean
   balance: number
