@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, Search, UserRound } from 'lucide-react'
+import { Check, RotateCcw, Search, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { createBooking } from '@/services/api'
+import { cancelBooking, createBooking } from '@/services/api'
 import { saveOfflineBooking } from '@/services/offlineDb'
-import { formatCurrency } from '@/lib/utils'
+import { useRecentTransactions } from '@/hooks/useAppData'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 import type { AppUser, Drink, ProductCategory } from '@/types/database'
 
 const categories: { value: ProductCategory; label: string }[] = [
@@ -80,6 +81,42 @@ export function QuickBooking({ users, drinks }: { users: AppUser[]; drinks: Drin
           </div>
         </CardContent>
       </Card>
+      <RecentBookings />
     </div>
+  )
+}
+
+function RecentBookings() {
+  const recent = useRecentTransactions()
+  const queryClient = useQueryClient()
+  const cancel = useMutation({
+    mutationFn: (transactionId: string) => cancelBooking(transactionId),
+    onSuccess: async () => { toast.success('Buchung storniert'); await queryClient.invalidateQueries() },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  if (!recent.data?.length) return null
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader><CardTitle>Letzte Buchungen</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {recent.data.map((transaction) => (
+          <div key={transaction.id} className="flex items-center justify-between rounded-2xl border border-border bg-slate-950 p-3">
+            <span className="flex items-center gap-2">
+              <span className="font-semibold">{transaction.user?.name ?? 'Unbekannt'}</span>
+              <span className="text-muted-foreground">· {transaction.drink?.icon} {transaction.drink?.name}</span>
+            </span>
+            <span className="flex items-center gap-3">
+              <span className="rounded-full border border-border px-3 py-1 text-sm">{formatCurrency(transaction.price)}</span>
+              <span className="text-sm text-muted-foreground">{formatDateTime(transaction.created_at)}</span>
+              <Button type="button" size="icon" variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate(transaction.id)} aria-label="Buchung stornieren">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   )
 }
