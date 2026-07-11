@@ -8,16 +8,22 @@ import { Input } from '@/components/ui/input'
 import { createBooking } from '@/services/api'
 import { saveOfflineBooking } from '@/services/offlineDb'
 import { formatCurrency } from '@/lib/utils'
-import type { AppUser, Drink } from '@/types/database'
+import type { AppUser, Drink, ProductCategory } from '@/types/database'
+
+const categories: { value: ProductCategory; label: string }[] = [
+  { value: 'getraenk', label: 'Getränke' },
+  { value: 'essen', label: 'Essen' },
+]
 
 export function QuickBooking({ users, drinks }: { users: AppUser[]; drinks: Drink[] }) {
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null)
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState<ProductCategory>('getraenk')
   const [lastBooked, setLastBooked] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const activeUsers = useMemo(() => users.filter((user) => user.is_active && user.name.toLowerCase().includes(search.toLowerCase())), [users, search])
-  const activeDrinks = useMemo(() => drinks.filter((drink) => drink.is_active), [drinks])
+  const activeDrinks = useMemo(() => drinks.filter((drink) => drink.is_active && drink.category === category), [drinks, category])
 
   const booking = useMutation({
     mutationFn: async (drink: Drink) => {
@@ -55,9 +61,16 @@ export function QuickBooking({ users, drinks }: { users: AppUser[]; drinks: Drin
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>2. Getränk buchen</CardTitle></CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <CardTitle>2. Buchen</CardTitle>
+          <div className="flex gap-2">
+            {categories.map((tab) => (
+              <Button key={tab.value} type="button" size="sm" variant={category === tab.value ? 'default' : 'outline'} onClick={() => setCategory(tab.value)}>{tab.label}</Button>
+            ))}
+          </div>
+        </CardHeader>
         <CardContent>
-          {!selectedUser ? <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">Erst Mitglied antippen, dann Getränk buchen.</div> : null}
+          {!selectedUser ? <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">Erst Mitglied antippen, dann Produkt buchen.</div> : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {activeDrinks.map((drink) => (
               <Button key={drink.id} size="lg" variant="secondary" disabled={!selectedUser || booking.isPending || drink.stock <= 0} onClick={() => booking.mutate(drink)} className={`h-28 flex-col text-lg ${lastBooked === drink.id ? 'scale-105 border border-primary bg-primary/20' : ''}`}>

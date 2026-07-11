@@ -83,3 +83,23 @@ export async function syncOfflineBooking(userId: string, drinkId: string) {
   const { error } = await supabase.rpc('book_drink_by_id', { p_user_id: userId, p_drink_id: drinkId })
   assertNoError(error)
 }
+
+export async function savePushSubscription(userId: string, subscription: PushSubscription) {
+  const json = subscription.toJSON()
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    { user_id: userId, endpoint: json.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+    { onConflict: 'endpoint' },
+  )
+  assertNoError(error)
+}
+
+export async function deletePushSubscriptionByEndpoint(endpoint: string) {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  assertNoError(error)
+}
+
+export async function sendPushNotification(payload: { title: string; body: string; url?: string; user_ids?: string[] }) {
+  const { data, error } = await supabase.functions.invoke('send-push', { body: payload })
+  if (error) throw new Error(await extractFunctionError(error))
+  return data as { sent: number; removed: number; total: number }
+}

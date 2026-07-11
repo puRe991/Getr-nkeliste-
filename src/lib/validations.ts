@@ -21,6 +21,7 @@ export const drinkSchema = z.object({
   stock: z.number().int().min(0).max(9999),
   is_active: z.boolean(),
   icon: z.string().trim().min(1).max(4),
+  category: z.enum(['getraenk', 'essen']),
 })
 
 export const balanceAdjustmentSchema = z.object({
