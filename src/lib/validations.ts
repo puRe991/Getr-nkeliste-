@@ -23,6 +23,11 @@ export const drinkSchema = z.object({
   icon: z.string().trim().min(1).max(4),
 })
 
+export const balanceAdjustmentSchema = z.object({
+  amount: z.number().finite().refine((value) => value !== 0, 'Betrag darf nicht 0 sein'),
+  note: z.string().trim().max(140).optional(),
+})
+
 export const bookingSchema = z.object({
   userId: z.string().uuid(),
   drinkId: z.string().uuid(),
@@ -36,4 +41,5 @@ export const dateRangeSchema = z.object({
 
 export type UserFormValues = z.infer<typeof userSchema>
 export type DrinkFormValues = z.infer<typeof drinkSchema>
+export type BalanceAdjustmentFormValues = z.infer<typeof balanceAdjustmentSchema>
 export type PasswordChangeValues = z.infer<typeof passwordChangeSchema>

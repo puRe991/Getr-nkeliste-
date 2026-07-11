@@ -46,7 +46,7 @@ Keine Service-Role-Keys im Frontend verwenden. Der Anon-Key ist öffentlich und 
 ## Supabase Einrichtung
 
 1. Neues Supabase-Projekt erstellen.
-2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql` und `supabase/migrations/002_password_auth.sql` ausführen.
+2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql`, `supabase/migrations/002_password_auth.sql` und `supabase/migrations/003_balance_adjustments.sql` (der Reihe nach) ausführen.
 3. Optional die Beispieldaten aus `supabase/seeds/seed.sql` ausführen.
 4. In **Authentication → Providers → Email** sowohl Passwort-Login als auch Magic Links aktivieren.
 5. In **Authentication → URL Configuration** die lokale URL und später die Vercel-Domain eintragen.
