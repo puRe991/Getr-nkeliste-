@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, FileText } from 'lucide-react'
+import { CalendarClock, FileText, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { UserCreateForm, DrinkCreateForm, BroadcastForm } from '@/features/admin/AdminForms'
 import { CsvExport } from '@/features/admin/CsvExport'
@@ -13,9 +13,9 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { useDrinks, useTransactions, useUsers } from '@/hooks/useAppData'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { balanceAdjustmentSchema } from '@/lib/validations'
-import { adjustBalance, updateUser } from '@/services/api'
+import { adjustBalance, cancelBooking, updateUser } from '@/services/api'
 import type { AppUser, Transaction } from '@/types/database'
 
 const userColumns = createColumnHelper<AppUser>()
@@ -43,7 +43,14 @@ export function AdminPage() {
       <div className="grid gap-4 lg:grid-cols-2"><UserCreateForm /><DrinkCreateForm /></div>
       <BroadcastForm />
       <Card><CardHeader><CardTitle>Benutzerverwaltung</CardTitle></CardHeader><CardContent className="overflow-x-auto"><Table><TableHeader>{table.getHeaderGroups().map((headerGroup) => <TableRow key={headerGroup.id}>{headerGroup.headers.map((header) => <TableHead key={header.id}>{flexRender(header.column.columnDef.header, header.getContext())}</TableHead>)}</TableRow>)}</TableHeader><TableBody>{table.getRowModel().rows.map((row) => <TableRow key={row.id}>{row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}</TableRow>)}</TableBody></Table></CardContent></Card>
-      <Card><CardHeader><CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5" /> Monatsübersicht & Export</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /><CsvExport transactions={transactions.data ?? []} /><Badge className="justify-center"><FileText className="mr-1 h-4 w-4" /> PDF vorbereitet</Badge></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{totals.map((row) => <div key={row.name} className="flex justify-between rounded-xl bg-slate-950 p-3"><span>{row.name}</span><strong>{formatCurrency(row.sum)}</strong></div>)}</div></CardContent></Card>
+      <Card><CardHeader><CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5" /> Monatsübersicht & Export</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /><CsvExport transactions={(transactions.data ?? []).filter((transaction) => !transaction.cancelled_at)} /><Badge className="justify-center"><FileText className="mr-1 h-4 w-4" /> PDF vorbereitet</Badge></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{totals.map((row) => <div key={row.name} className="flex justify-between rounded-xl bg-slate-950 p-3"><span>{row.name}</span><strong>{formatCurrency(row.sum)}</strong></div>)}</div></CardContent></Card>
+      <Card>
+        <CardHeader><CardTitle>Transaktionen</CardTitle></CardHeader>
+        <CardContent className="max-h-[60vh] space-y-2 overflow-auto">
+          {(transactions.data ?? []).length === 0 && <p className="text-muted-foreground">Keine Buchungen im gewählten Zeitraum.</p>}
+          {(transactions.data ?? []).map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)}
+        </CardContent>
+      </Card>
       <Card><CardHeader><CardTitle>Benutzer QR-Codes</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{userData.filter((user) => user.is_active).slice(0, 10).map((user) => <UserQrCode key={user.id} userId={user.id} name={user.name} />)}</CardContent></Card>
       <Card><CardHeader><CardTitle>Getränke & Essen</CardTitle></CardHeader><CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{(drinks.data ?? []).map((drink) => <div key={drink.id} className="rounded-xl bg-slate-950 p-3"><div className="flex items-center justify-between"><span className="text-2xl">{drink.icon}</span><Badge>{drink.category === 'essen' ? 'Essen' : 'Getränk'}</Badge></div><p className="font-bold">{drink.name}</p><p className="text-muted-foreground">{formatCurrency(drink.price)} · Bestand {drink.stock}</p></div>)}</CardContent></Card>
     </div>
@@ -85,8 +92,38 @@ function ActiveToggle({ user }: { user: AppUser }) {
   return <Switch checked={user.is_active} onCheckedChange={(checked) => mutation.mutate(checked)} />
 }
 
+function TransactionRow({ transaction }: { transaction: Transaction }) {
+  const queryClient = useQueryClient()
+  const cancelled = Boolean(transaction.cancelled_at)
+  const cancel = useMutation({
+    mutationFn: () => cancelBooking(transaction.id),
+    onSuccess: async () => { toast.success('Buchung storniert'); await queryClient.invalidateQueries() },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  return (
+    <div className={`flex items-center justify-between rounded-xl bg-slate-950 p-3 ${cancelled ? 'opacity-50' : ''}`}>
+      <span className="flex items-center gap-2">
+        <span className="font-semibold">{transaction.user?.name ?? 'Unbekannt'}</span>
+        <span className="text-muted-foreground">· {transaction.drink?.icon} {transaction.drink?.name}</span>
+      </span>
+      <span className="flex items-center gap-3">
+        <span className="rounded-full border border-border px-3 py-1 text-sm">{formatCurrency(transaction.price)}</span>
+        <span className="text-sm text-muted-foreground">{formatDateTime(transaction.created_at)}</span>
+        {cancelled ? (
+          <Badge>Storniert</Badge>
+        ) : (
+          <Button type="button" size="icon" variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate()} aria-label="Buchung stornieren">
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        )}
+      </span>
+    </div>
+  )
+}
+
 function aggregateByUser(transactions: Transaction[]) {
-  return Object.values(transactions.reduce<Record<string, { name: string; sum: number }>>((acc, transaction) => {
+  return Object.values(transactions.filter((transaction) => !transaction.cancelled_at).reduce<Record<string, { name: string; sum: number }>>((acc, transaction) => {
     const name = transaction.user?.name ?? 'Unbekannt'
     acc[name] = { name, sum: (acc[name]?.sum ?? 0) + transaction.price }
     return acc
