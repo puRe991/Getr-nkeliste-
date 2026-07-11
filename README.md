@@ -46,18 +46,26 @@ Keine Service-Role-Keys im Frontend verwenden. Der Anon-Key ist öffentlich und 
 ## Supabase Einrichtung
 
 1. Neues Supabase-Projekt erstellen.
-2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql` und `supabase/migrations/002_balance_adjustments.sql` (der Reihe nach) ausführen.
+2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql`, `supabase/migrations/002_password_auth.sql` und `supabase/migrations/003_balance_adjustments.sql` (der Reihe nach) ausführen.
 3. Optional die Beispieldaten aus `supabase/seeds/seed.sql` ausführen.
-4. In **Authentication → Providers → Email** Magic Links aktivieren.
+4. In **Authentication → Providers → Email** sowohl Passwort-Login als auch Magic Links aktivieren.
 5. In **Authentication → URL Configuration** die lokale URL und später die Vercel-Domain eintragen.
-6. Den ersten Admin in der Tabelle `public.users` mit `auth_user_id` des Supabase-Auth-Benutzers verknüpfen.
+6. Die Edge Function für die Admin-Benutzererstellung deployen: `supabase functions deploy admin-create-user`. Sie läuft mit dem automatisch bereitgestellten Service-Role-Key der Function-Runtime – dieser landet nie im Frontend.
+7. Den ersten Admin in der Tabelle `public.users` mit `auth_user_id` des Supabase-Auth-Benutzers verknüpfen (für alle weiteren Mitglieder übernimmt das Admin-Formular die Verknüpfung automatisch).
 
 ### Tabellen
 
-- `users`: Mitglieder, Rollen, Aktivstatus und Kontostand.
+- `users`: Mitglieder, E-Mail, Rollen, Aktivstatus und Kontostand.
 - `drinks`: Getränke, Preis, Bestand, Aktivstatus und Icon.
 - `transactions`: unveränderliche Buchungshistorie mit Preis zum Buchungszeitpunkt.
 - `settings`: zentrale JSON-Konfiguration.
+
+### Passwort-Login und Benutzerverwaltung
+
+- Anmeldung ist per Passwort oder Magic Link möglich (Umschalter auf der Login-Seite).
+- Legt ein Admin im Adminbereich ein neues Mitglied an, erstellt eine Edge Function (`admin-create-user`, läuft mit Service-Role-Key serverseitig) automatisch einen Supabase-Auth-Account mit zufällig generiertem Startpasswort. Das Passwort wird dem Admin einmalig angezeigt und muss sicher an das Mitglied weitergegeben werden.
+- Neue Accounts sind mit `must_change_password` markiert; nach dem Login zeigt die App einen Hinweisbanner mit Link zu **Konto → Passwort ändern** (`/konto`), bis das Mitglied ein eigenes Passwort gesetzt hat.
+- Jeder angemeldete Benutzer kann sein Passwort jederzeit über das Schlüssel-Icon im Header ändern.
 
 ### Rollenmodell
 

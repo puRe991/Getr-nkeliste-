@@ -77,7 +77,7 @@ function BalanceAdjustCell({ userId }: { userId: string }) {
 function ActiveToggle({ user }: { user: AppUser }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: (is_active: boolean) => updateUser(user.id, { name: user.name, role: user.role, balance: user.balance, is_active }),
+    mutationFn: (is_active: boolean) => updateUser(user.id, { name: user.name, email: user.email ?? '', role: user.role, balance: user.balance, is_active }),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['users'] }) },
     onError: (error: Error) => toast.error(error.message),
   })

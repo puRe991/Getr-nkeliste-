@@ -8,6 +8,7 @@ const KassePage = lazy(() => import('@/pages/KassePage').then((module) => ({ def
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const InventoryPage = lazy(() => import('@/pages/InventoryPage').then((module) => ({ default: module.InventoryPage })))
 const AdminPage = lazy(() => import('@/pages/AdminPage').then((module) => ({ default: module.AdminPage })))
+const AccountPage = lazy(() => import('@/pages/AccountPage').then((module) => ({ default: module.AccountPage })))
 
 const router = createBrowserRouter([
   { path: '/', element: <AuthGate><Layout /></AuthGate>, children: [
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
     { path: 'dashboard', element: <Page><DashboardPage /></Page> },
     { path: 'lager', element: <Page><InventoryPage /></Page> },
     { path: 'admin', element: <Page><AdminPage /></Page> },
+    { path: 'konto', element: <Page><AccountPage /></Page> },
   ] },
 ])
 

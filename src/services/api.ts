@@ -19,8 +19,26 @@ export async function getDrinks() {
 }
 
 export async function createUser(values: UserFormValues) {
-  const { error } = await supabase.from('users').insert({ name: values.name, role: values.role, is_active: values.is_active, balance: values.balance })
-  assertNoError(error)
+  const { data, error } = await supabase.functions.invoke('admin-create-user', {
+    body: { name: values.name, email: values.email, role: values.role, is_active: values.is_active, balance: values.balance },
+  })
+  if (error) throw new Error(await extractFunctionError(error))
+  return data as { user: AppUser; password: string }
+}
+
+async function extractFunctionError(error: unknown) {
+  if (error && typeof error === 'object' && 'context' in error) {
+    const context = (error as { context?: Response }).context
+    if (context) {
+      try {
+        const body = await context.json()
+        if (body?.error) return body.error as string
+      } catch {
+        return error instanceof Error ? error.message : 'Unbekannter Fehler'
+      }
+    }
+  }
+  return error instanceof Error ? error.message : 'Unbekannter Fehler'
 }
 
 export async function updateUser(id: string, values: UserFormValues) {
