@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -9,21 +10,36 @@ import { Switch } from '@/components/ui/switch'
 import { appConfig } from '@/lib/config'
 import { formatCurrency } from '@/lib/utils'
 import { drinkSchema, type DrinkFormValues } from '@/lib/validations'
-import { updateDrink } from '@/services/api'
+import { sendPushNotification, updateDrink } from '@/services/api'
 import { useDrinks } from '@/hooks/useAppData'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import type { Drink } from '@/types/database'
+import type { Drink, ProductCategory } from '@/types/database'
+
+const categories: { value: ProductCategory; label: string }[] = [
+  { value: 'getraenk', label: 'Getränke' },
+  { value: 'essen', label: 'Essen' },
+]
 
 export function InventoryPage() {
+  const [category, setCategory] = useState<ProductCategory>('getraenk')
   const drinks = useDrinks()
   const currentUser = useCurrentUser()
   const isAdmin = currentUser.data?.role === 'admin'
   if (drinks.isLoading) return <div className="p-8 text-center text-muted-foreground">Lade Lager…</div>
+  const filtered = (drinks.data ?? []).filter((drink) => drink.category === category)
   return (
     <Card>
-      <CardHeader><CardTitle>Aktueller Lagerbestand</CardTitle></CardHeader>
+      <CardHeader className="flex-row items-center justify-between gap-3">
+        <CardTitle>Aktueller Lagerbestand</CardTitle>
+        <div className="flex gap-2">
+          {categories.map((tab) => (
+            <Button key={tab.value} type="button" size="sm" variant={category === tab.value ? 'default' : 'outline'} onClick={() => setCategory(tab.value)}>{tab.label}</Button>
+          ))}
+        </div>
+      </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(drinks.data ?? []).map((drink) => (isAdmin ? <AdminDrinkCard key={drink.id} drink={drink} /> : <DrinkCard key={drink.id} drink={drink} />))}
+        {filtered.length === 0 && <p className="text-muted-foreground">Keine Produkte in dieser Kategorie.</p>}
+        {filtered.map((drink) => (isAdmin ? <AdminDrinkCard key={drink.id} drink={drink} /> : <DrinkCard key={drink.id} drink={drink} />))}
       </CardContent>
     </Card>
   )
@@ -50,10 +66,13 @@ function AdminDrinkCard({ drink }: { drink: Drink }) {
   })
 
   function patch(partial: Partial<DrinkFormValues>) {
-    const values: DrinkFormValues = { name: drink.name, icon: drink.icon, price: drink.price, stock: drink.stock, is_active: drink.is_active, ...partial }
+    const values: DrinkFormValues = { name: drink.name, icon: drink.icon, price: drink.price, stock: drink.stock, is_active: drink.is_active, category: drink.category, ...partial }
     const parsed = drinkSchema.safeParse(values)
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? 'Ungültiger Wert'); return }
     mutation.mutate(parsed.data)
+    if (drink.stock > appConfig.lowStockThreshold && parsed.data.stock <= appConfig.lowStockThreshold) {
+      void sendPushNotification({ title: 'Lagerwarnung', body: `${drink.name} ist bald leer (noch ${parsed.data.stock}).`, url: '/lager' }).catch(() => {})
+    }
   }
 
   const low = drink.stock <= appConfig.lowStockThreshold

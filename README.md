@@ -11,6 +11,8 @@ Eine produktionsreife, mobile-first Progressive Web App für Freiwillige Feuerwe
 - **Supabase Backend:** Auth, PostgreSQL, Row Level Security, RPC für atomare Buchungen.
 - **Adminbereich:** Mitglieder, Getränke, Preise, Bestände, Monatsübersicht, CSV-Export und QR-Codes.
 - **Dashboard:** offene Beträge, meistverkaufte Getränke, Lagerwarnungen und letzte Buchungen.
+- **Inventar für Getränke & Essen:** Produkte lassen sich als Getränk oder Essen kategorisieren, Kasse und Lager filtern per Tab danach.
+- **Push-Benachrichtigungen:** Mitglieder aktivieren Web-Push in ihrem Konto; Admins können Broadcast-Nachrichten senden, und bei niedrigem Lagerbestand wird automatisch benachrichtigt.
 - **Deployment:** direkt auf Vercel hostbar.
 
 ## Tech Stack
@@ -39,6 +41,7 @@ Danach läuft die App standardmäßig unter `http://localhost:5173`.
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-public-anon-key
 VITE_APP_NAME=Getränkekasse
+VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 ```
 
 Keine Service-Role-Keys im Frontend verwenden. Der Anon-Key ist öffentlich und wird durch Row Level Security abgesichert.
@@ -46,19 +49,32 @@ Keine Service-Role-Keys im Frontend verwenden. Der Anon-Key ist öffentlich und 
 ## Supabase Einrichtung
 
 1. Neues Supabase-Projekt erstellen.
-2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql`, `supabase/migrations/002_password_auth.sql` und `supabase/migrations/003_balance_adjustments.sql` (der Reihe nach) ausführen.
+2. In Supabase SQL Editor die Migrationen aus `supabase/migrations/001_initial_schema.sql` bis `supabase/migrations/005_push_subscriptions.sql` (der Reihe nach) ausführen.
 3. Optional die Beispieldaten aus `supabase/seeds/seed.sql` ausführen.
 4. In **Authentication → Providers → Email** sowohl Passwort-Login als auch Magic Links aktivieren.
 5. In **Authentication → URL Configuration** die lokale URL und später die Vercel-Domain eintragen.
-6. Die Edge Function für die Admin-Benutzererstellung deployen: `supabase functions deploy admin-create-user`. Sie läuft mit dem automatisch bereitgestellten Service-Role-Key der Function-Runtime – dieser landet nie im Frontend.
+6. Die Edge Functions deployen: `supabase functions deploy admin-create-user` und `supabase functions deploy send-push`. Sie laufen mit dem automatisch bereitgestellten Service-Role-Key der Function-Runtime – dieser landet nie im Frontend.
 7. Den ersten Admin in der Tabelle `public.users` mit `auth_user_id` des Supabase-Auth-Benutzers verknüpfen (für alle weiteren Mitglieder übernimmt das Admin-Formular die Verknüpfung automatisch).
 
 ### Tabellen
 
 - `users`: Mitglieder, E-Mail, Rollen, Aktivstatus und Kontostand.
-- `drinks`: Getränke, Preis, Bestand, Aktivstatus und Icon.
+- `drinks`: Getränke und Essen (`category`: `getraenk` oder `essen`), Preis, Bestand, Aktivstatus und Icon.
 - `transactions`: unveränderliche Buchungshistorie mit Preis zum Buchungszeitpunkt.
 - `settings`: zentrale JSON-Konfiguration.
+- `balance_adjustments`: Audit-Trail für manuelle Kontostand-Anpassungen durch Admins.
+- `push_subscriptions`: Web-Push-Endpoints je Mitglied für Benachrichtigungen.
+
+### Getränke & Essen
+
+Die Kasse und das Lager filtern Produkte über Tabs nach Kategorie (Getränke/Essen). Beim Anlegen eines Produkts im Adminbereich wird die Kategorie ausgewählt; bestehende Getränke laufen automatisch unter `getraenk` weiter.
+
+### Push-Benachrichtigungen
+
+- Mitglieder aktivieren Push in **Konto → Push-Benachrichtigungen** (benötigt HTTPS bzw. `localhost` und einen Browser mit Push-API-Unterstützung). In der Capacitor-APK ist Web-Push nicht garantiert nutzbar – primär für die installierte PWA gedacht.
+- Admins können im Adminbereich eine Broadcast-Nachricht an alle registrierten Geräte senden.
+- Bei Unterschreiten der Lagerwarnschwelle wird beim Bestand-Update im Lager automatisch eine Push-Benachrichtigung ausgelöst.
+- Setup: VAPID-Schlüsselpaar erzeugen (`npx web-push generate-vapid-keys`), den öffentlichen Schlüssel als `VITE_VAPID_PUBLIC_KEY` im Frontend setzen und `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` sowie optional `VAPID_SUBJECT` (z. B. `mailto:admin@example.com`) als Secrets der `send-push`-Function hinterlegen: `supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:admin@example.com`.
 
 ### Passwort-Login und Benutzerverwaltung
 
@@ -162,4 +178,4 @@ supabase/
 - Preise nur über Admins ändern, da Transaktionen den historischen Buchungspreis speichern.
 - Lagerwarnung greift standardmäßig ab 12 Einheiten.
 - Für kleine Wehren reicht Vercel + Supabase Free Tier in der Regel aus.
-- Für zukünftige Erweiterungen sind NFC, mehrere Standorte, Inventar, Essen, Dienstabendmodus und Push Notifications architektonisch vorbereitet, aber bewusst nicht implementiert.
+- Inventar für Essen und Push-Benachrichtigungen sind umgesetzt. Für zukünftige Erweiterungen sind NFC, mehrere Standorte und ein Dienstabendmodus architektonisch vorbereitet, aber bewusst nicht implementiert.

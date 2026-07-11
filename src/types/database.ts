@@ -11,6 +11,8 @@ export type AppUser = {
   created_at: string
 }
 
+export type ProductCategory = 'getraenk' | 'essen'
+
 export type Drink = {
   id: string
   name: string
@@ -18,6 +20,7 @@ export type Drink = {
   stock: number
   is_active: boolean
   icon: string
+  category: ProductCategory
   created_at: string
 }
 
