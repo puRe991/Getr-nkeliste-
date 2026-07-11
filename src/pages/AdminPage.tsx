@@ -1,15 +1,21 @@
 import { useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 import { UserCreateForm, DrinkCreateForm } from '@/features/admin/AdminForms'
 import { CsvExport } from '@/features/admin/CsvExport'
 import { UserQrCode } from '@/features/qr/UserQrCode'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { useDrinks, useTransactions, useUsers } from '@/hooks/useAppData'
 import { formatCurrency } from '@/lib/utils'
+import { balanceAdjustmentSchema } from '@/lib/validations'
+import { adjustBalance, updateUser } from '@/services/api'
 import type { AppUser, Transaction } from '@/types/database'
 
 const userColumns = createColumnHelper<AppUser>()
@@ -26,7 +32,8 @@ export function AdminPage() {
     userColumns.accessor('name', { header: 'Name' }),
     userColumns.accessor('role', { header: 'Rolle', cell: (info) => <Badge>{info.getValue()}</Badge> }),
     userColumns.accessor('balance', { header: 'Kontostand', cell: (info) => formatCurrency(info.getValue()) }),
-    userColumns.accessor('is_active', { header: 'Status', cell: (info) => info.getValue() ? 'Aktiv' : 'Inaktiv' }),
+    userColumns.display({ id: 'adjust', header: 'Guthaben anpassen', cell: (info) => <BalanceAdjustCell userId={info.row.original.id} /> }),
+    userColumns.accessor('is_active', { header: 'Status', cell: (info) => <ActiveToggle user={info.row.original} /> }),
   ], [])
   const table = useReactTable({ data: userData, columns, getCoreRowModel: getCoreRowModel() })
   const totals = aggregateByUser(transactions.data ?? [])
@@ -40,6 +47,41 @@ export function AdminPage() {
       <Card><CardHeader><CardTitle>Getränke</CardTitle></CardHeader><CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{(drinks.data ?? []).map((drink) => <div key={drink.id} className="rounded-xl bg-slate-950 p-3"><span className="text-2xl">{drink.icon}</span><p className="font-bold">{drink.name}</p><p className="text-muted-foreground">{formatCurrency(drink.price)} · Bestand {drink.stock}</p></div>)}</CardContent></Card>
     </div>
   )
+}
+
+function BalanceAdjustCell({ userId }: { userId: string }) {
+  const queryClient = useQueryClient()
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const mutation = useMutation({
+    mutationFn: () => adjustBalance(userId, Number(amount), note.trim() || undefined),
+    onSuccess: async () => { setAmount(''); setNote(''); toast.success('Kontostand angepasst'); await queryClient.invalidateQueries({ queryKey: ['users'] }) },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  function submit() {
+    const parsed = balanceAdjustmentSchema.safeParse({ amount: Number(amount), note: note.trim() || undefined })
+    if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? 'Ungültiger Betrag'); return }
+    mutation.mutate()
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input className="h-10 w-24" type="number" step="0.01" placeholder="+/- Betrag" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <Input className="h-10 w-32" placeholder="Notiz" value={note} onChange={(e) => setNote(e.target.value)} />
+      <Button type="button" size="sm" disabled={!amount || mutation.isPending} onClick={submit}>Anpassen</Button>
+    </div>
+  )
+}
+
+function ActiveToggle({ user }: { user: AppUser }) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: (is_active: boolean) => updateUser(user.id, { name: user.name, role: user.role, balance: user.balance, is_active }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['users'] }) },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  return <Switch checked={user.is_active} onCheckedChange={(checked) => mutation.mutate(checked)} />
 }
 
 function aggregateByUser(transactions: Transaction[]) {

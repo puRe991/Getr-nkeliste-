@@ -38,6 +38,11 @@ export async function updateDrink(id: string, values: DrinkFormValues) {
   assertNoError(error)
 }
 
+export async function adjustBalance(userId: string, amount: number, note?: string) {
+  const { error } = await supabase.rpc('adjust_balance', { p_user_id: userId, p_amount: amount, p_note: note ?? null })
+  assertNoError(error)
+}
+
 export async function createBooking(userId: string, drink: Drink) {
   const { error } = await supabase.rpc('book_drink', { p_user_id: userId, p_drink_id: drink.id })
   assertNoError(error)

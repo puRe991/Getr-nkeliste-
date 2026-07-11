@@ -2,6 +2,7 @@ export type UserRole = 'admin' | 'mitglied'
 
 export type AppUser = {
   id: string
+  auth_user_id: string | null
   name: string
   role: UserRole
   is_active: boolean
